@@ -23,3 +23,6 @@ clean: $(SUBDIRS_CLEAN)
 
 program:
 	#djtgcfg prog -d Atlys --index 0 --file fpga/fpga.bit
+
+g:
+	vivado -nojournal -nolog fpga/fpga.xpr &
