@@ -1,36 +1,3 @@
-/*
-
-Copyright 2019, The Regents of the University of California.
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-   1. Redistributions of source code must retain the above copyright notice,
-      this list of conditions and the following disclaimer.
-
-   2. Redistributions in binary form must reproduce the above copyright notice,
-      this list of conditions and the following disclaimer in the documentation
-      and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE REGENTS OF THE UNIVERSITY OF CALIFORNIA ''AS
-IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE REGENTS OF THE UNIVERSITY OF CALIFORNIA OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
-OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
-IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
-OF SUCH DAMAGE.
-
-The views and conclusions contained in the software and documentation are those
-of the authors and should not be interpreted as representing official policies,
-either expressed or implied, of The Regents of the University of California.
-
-*/
-
 // Language: Verilog 2001
 
 `timescale 1ns / 1ps
@@ -63,19 +30,6 @@ module fpga (
      */
     inout  wire         i2c_scl,
     inout  wire         i2c_sda,
-
-    /*
-     * PCI express
-     */
-    input  wire [15:0]  pcie_rx_p,
-    input  wire [15:0]  pcie_rx_n,
-    output wire [15:0]  pcie_tx_p,
-    output wire [15:0]  pcie_tx_n,
-    // input  wire         pcie_refclk_1_p,
-    // input  wire         pcie_refclk_1_n,
-    input  wire         pcie_refclk_2_p,
-    input  wire         pcie_refclk_2_n,
-    input  wire         pcie_reset_n,
 
     /*
      * Ethernet: QSFP28
@@ -149,106 +103,39 @@ parameter BAR0_APERTURE = 24;
 parameter AXIS_ETH_DATA_WIDTH = 512;
 parameter AXIS_ETH_KEEP_WIDTH = AXIS_ETH_DATA_WIDTH/8;
 
-// Clock and reset
-wire pcie_user_clk;
-wire pcie_user_reset;
+wire clk_250mhz;
+wire clk_250mhz_rst;
+wire clk_125mhz;
+wire clk_125mhz_rst;
+wire clk_locked;
 
-wire clk_125mhz_ibufg;
-wire clk_125mhz_mmcm_out;
+sysclk_bd sysclk_bd_i (
+        .clk_125MHz (clk_125mhz),
+        .clk_250MHz (clk_250mhz),
+        .clk_locked (clk_locked),
 
-// Internal 125 MHz clock
-wire clk_125mhz_int;
-wire rst_125mhz_int;
-
-// Internal 156.25 MHz clock
-wire clk_156mhz_int;
-wire rst_156mhz_int;
-
-wire mmcm_rst = pcie_user_reset;
-wire mmcm_locked;
-wire mmcm_clkfb;
-
-IBUFGDS #(
-   .DIFF_TERM("FALSE"),
-   .IBUF_LOW_PWR("FALSE")   
-)
-clk_125mhz_ibufg_inst (
-   .O   (clk_125mhz_ibufg),
-   .I   (clk_125mhz_p),
-   .IB  (clk_125mhz_n) 
-);
-
-// MMCM instance
-// 125 MHz in, 125 MHz out
-// PFD range: 10 MHz to 500 MHz
-// VCO range: 800 MHz to 1600 MHz
-// M = 8, D = 1 sets Fvco = 1000 MHz (in range)
-// Divide by 8 to get output frequency of 125 MHz
-MMCME3_BASE #(
-    .BANDWIDTH("OPTIMIZED"),
-    .CLKOUT0_DIVIDE_F(8),
-    .CLKOUT0_DUTY_CYCLE(0.5),
-    .CLKOUT0_PHASE(0),
-    .CLKOUT1_DIVIDE(1),
-    .CLKOUT1_DUTY_CYCLE(0.5),
-    .CLKOUT1_PHASE(0),
-    .CLKOUT2_DIVIDE(1),
-    .CLKOUT2_DUTY_CYCLE(0.5),
-    .CLKOUT2_PHASE(0),
-    .CLKOUT3_DIVIDE(1),
-    .CLKOUT3_DUTY_CYCLE(0.5),
-    .CLKOUT3_PHASE(0),
-    .CLKOUT4_DIVIDE(1),
-    .CLKOUT4_DUTY_CYCLE(0.5),
-    .CLKOUT4_PHASE(0),
-    .CLKOUT5_DIVIDE(1),
-    .CLKOUT5_DUTY_CYCLE(0.5),
-    .CLKOUT5_PHASE(0),
-    .CLKOUT6_DIVIDE(1),
-    .CLKOUT6_DUTY_CYCLE(0.5),
-    .CLKOUT6_PHASE(0),
-    .CLKFBOUT_MULT_F(8),
-    .CLKFBOUT_PHASE(0),
-    .DIVCLK_DIVIDE(1),
-    .REF_JITTER1(0.010),
-    .CLKIN1_PERIOD(8.0),
-    .STARTUP_WAIT("FALSE"),
-    .CLKOUT4_CASCADE("FALSE")
-)
-clk_mmcm_inst (
-    .CLKIN1(clk_125mhz_ibufg),
-    .CLKFBIN(mmcm_clkfb),
-    .RST(mmcm_rst),
-    .PWRDWN(1'b0),
-    .CLKOUT0(clk_125mhz_mmcm_out),
-    .CLKOUT0B(),
-    .CLKOUT1(),
-    .CLKOUT1B(),
-    .CLKOUT2(),
-    .CLKOUT2B(),
-    .CLKOUT3(),
-    .CLKOUT3B(),
-    .CLKOUT4(),
-    .CLKOUT5(),
-    .CLKOUT6(),
-    .CLKFBOUT(mmcm_clkfb),
-    .CLKFBOUTB(),
-    .LOCKED(mmcm_locked)
-);
-
-BUFG
-clk_125mhz_bufg_inst (
-    .I(clk_125mhz_mmcm_out),
-    .O(clk_125mhz_int)
+	// TODO which rst shall we use?
+        .reset_0 (reset_0),
+        .sysclk_125_clk_n (clk_125mhz_n),
+        .sysclk_125_clk_p (clk_125mhz_p)
 );
 
 sync_reset #(
     .N(4)
 )
 sync_reset_125mhz_inst (
-    .clk(clk_125mhz_int),
-    .rst(~mmcm_locked),
-    .out(rst_125mhz_int)
+    .clk(clk_125mhz),
+    .rst(~clk_locked),
+    .out(clk_125mhz_rst)
+);
+
+sync_reset #(
+    .N(4)
+)
+sync_reset_250mhz_inst (
+    .clk(clk_250mhz),
+    .rst(~clk_locked),
+    .out(clk_250mhz_rst)
 );
 
 // GPIO
@@ -275,8 +162,8 @@ debounce_switch #(
     .RATE(250000)
 )
 debounce_switch_inst (
-    .clk(pcie_user_clk),
-    .rst(pcie_user_reset),
+    .clk(clk_250mhz),
+    .rst(clk_250mhz_rst),
     .in({btnu,
         btnl,
         btnd,
@@ -296,7 +183,7 @@ sync_signal #(
     .N(2)
 )
 sync_signal_inst (
-    .clk(pcie_user_clk),
+    .clk(clk_250mhz),
     .in({qsfp1_modprsl, qsfp2_modprsl, qsfp1_intl, qsfp2_intl,
         i2c_scl, i2c_sda}),
     .out({qsfp1_modprsl_int, qsfp2_modprsl_int, qsfp1_intl_int, qsfp2_intl_int,
@@ -305,260 +192,6 @@ sync_signal_inst (
 
 assign i2c_scl = i2c_scl_t ? 1'bz : i2c_scl_o;
 assign i2c_sda = i2c_sda_t ? 1'bz : i2c_sda_o;
-
-// PCIe
-wire pcie_sys_clk;
-wire pcie_sys_clk_gt;
-
-IBUFDS_GTE4 #(
-    .REFCLK_HROW_CK_SEL(2'b00)
-)
-ibufds_gte4_pcie_mgt_refclk_inst (
-    .I             (pcie_refclk_2_p),
-    .IB            (pcie_refclk_2_n),
-    .CEB           (1'b0),
-    .O             (pcie_sys_clk_gt),
-    .ODIV2         (pcie_sys_clk)
-);
-
-wire [AXIS_PCIE_DATA_WIDTH-1:0]    axis_rq_tdata;
-wire [AXIS_PCIE_KEEP_WIDTH-1:0]    axis_rq_tkeep;
-wire                               axis_rq_tlast;
-wire                               axis_rq_tready;
-wire [AXIS_PCIE_RQ_USER_WIDTH-1:0] axis_rq_tuser;
-wire                               axis_rq_tvalid;
-
-wire [AXIS_PCIE_DATA_WIDTH-1:0]    axis_rc_tdata;
-wire [AXIS_PCIE_KEEP_WIDTH-1:0]    axis_rc_tkeep;
-wire                               axis_rc_tlast;
-wire                               axis_rc_tready;
-wire [AXIS_PCIE_RC_USER_WIDTH-1:0] axis_rc_tuser;
-wire                               axis_rc_tvalid;
-
-wire [AXIS_PCIE_DATA_WIDTH-1:0]    axis_cq_tdata;
-wire [AXIS_PCIE_KEEP_WIDTH-1:0]    axis_cq_tkeep;
-wire                               axis_cq_tlast;
-wire                               axis_cq_tready;
-wire [AXIS_PCIE_CQ_USER_WIDTH-1:0] axis_cq_tuser;
-wire                               axis_cq_tvalid;
-
-wire [AXIS_PCIE_DATA_WIDTH-1:0]    axis_cc_tdata;
-wire [AXIS_PCIE_KEEP_WIDTH-1:0]    axis_cc_tkeep;
-wire                               axis_cc_tlast;
-wire                               axis_cc_tready;
-wire [AXIS_PCIE_CC_USER_WIDTH-1:0] axis_cc_tuser;
-wire                               axis_cc_tvalid;
-
-wire [RQ_SEQ_NUM_WIDTH-1:0]        pcie_rq_seq_num0;
-wire                               pcie_rq_seq_num_vld0;
-wire [RQ_SEQ_NUM_WIDTH-1:0]        pcie_rq_seq_num1;
-wire                               pcie_rq_seq_num_vld1;
-
-wire [3:0] pcie_tfc_nph_av;
-wire [3:0] pcie_tfc_npd_av;
-
-wire [2:0] cfg_max_payload;
-wire [2:0] cfg_max_read_req;
-
-wire [9:0]  cfg_mgmt_addr;
-wire [7:0]  cfg_mgmt_function_number;
-wire        cfg_mgmt_write;
-wire [31:0] cfg_mgmt_write_data;
-wire [3:0]  cfg_mgmt_byte_enable;
-wire        cfg_mgmt_read;
-wire [31:0] cfg_mgmt_read_data;
-wire        cfg_mgmt_read_write_done;
-
-wire [7:0]  cfg_fc_ph;
-wire [11:0] cfg_fc_pd;
-wire [7:0]  cfg_fc_nph;
-wire [11:0] cfg_fc_npd;
-wire [7:0]  cfg_fc_cplh;
-wire [11:0] cfg_fc_cpld;
-wire [2:0]  cfg_fc_sel;
-
-wire [3:0]  cfg_interrupt_msi_enable;
-wire [11:0] cfg_interrupt_msi_mmenable;
-wire        cfg_interrupt_msi_mask_update;
-wire [31:0] cfg_interrupt_msi_data;
-wire [3:0]  cfg_interrupt_msi_select;
-wire [31:0] cfg_interrupt_msi_int;
-wire [31:0] cfg_interrupt_msi_pending_status;
-wire        cfg_interrupt_msi_pending_status_data_enable;
-wire [3:0]  cfg_interrupt_msi_pending_status_function_num;
-wire        cfg_interrupt_msi_sent;
-wire        cfg_interrupt_msi_fail;
-wire [2:0]  cfg_interrupt_msi_attr;
-wire        cfg_interrupt_msi_tph_present;
-wire [1:0]  cfg_interrupt_msi_tph_type;
-wire [8:0]  cfg_interrupt_msi_tph_st_tag;
-wire [3:0]  cfg_interrupt_msi_function_number;
-
-wire status_error_cor;
-wire status_error_uncor;
-
-pcie4_uscale_plus_0
-pcie4_uscale_plus_inst (
-    .pci_exp_txn(pcie_tx_n),
-    .pci_exp_txp(pcie_tx_p),
-    .pci_exp_rxn(pcie_rx_n),
-    .pci_exp_rxp(pcie_rx_p),
-    .user_clk(pcie_user_clk),
-    .user_reset(pcie_user_reset),
-    .user_lnk_up(),
-
-    .s_axis_rq_tdata(axis_rq_tdata),
-    .s_axis_rq_tkeep(axis_rq_tkeep),
-    .s_axis_rq_tlast(axis_rq_tlast),
-    .s_axis_rq_tready(axis_rq_tready),
-    .s_axis_rq_tuser(axis_rq_tuser),
-    .s_axis_rq_tvalid(axis_rq_tvalid),
-
-    .m_axis_rc_tdata(axis_rc_tdata),
-    .m_axis_rc_tkeep(axis_rc_tkeep),
-    .m_axis_rc_tlast(axis_rc_tlast),
-    .m_axis_rc_tready(axis_rc_tready),
-    .m_axis_rc_tuser(axis_rc_tuser),
-    .m_axis_rc_tvalid(axis_rc_tvalid),
-
-    .m_axis_cq_tdata(axis_cq_tdata),
-    .m_axis_cq_tkeep(axis_cq_tkeep),
-    .m_axis_cq_tlast(axis_cq_tlast),
-    .m_axis_cq_tready(axis_cq_tready),
-    .m_axis_cq_tuser(axis_cq_tuser),
-    .m_axis_cq_tvalid(axis_cq_tvalid),
-
-    .s_axis_cc_tdata(axis_cc_tdata),
-    .s_axis_cc_tkeep(axis_cc_tkeep),
-    .s_axis_cc_tlast(axis_cc_tlast),
-    .s_axis_cc_tready(axis_cc_tready),
-    .s_axis_cc_tuser(axis_cc_tuser),
-    .s_axis_cc_tvalid(axis_cc_tvalid),
-
-    .pcie_rq_seq_num0(pcie_rq_seq_num0),
-    .pcie_rq_seq_num_vld0(pcie_rq_seq_num_vld0),
-    .pcie_rq_seq_num1(pcie_rq_seq_num1),
-    .pcie_rq_seq_num_vld1(pcie_rq_seq_num_vld1),
-    .pcie_rq_tag0(),
-    .pcie_rq_tag1(),
-    .pcie_rq_tag_av(),
-    .pcie_rq_tag_vld0(),
-    .pcie_rq_tag_vld1(),
-
-    .pcie_tfc_nph_av(pcie_tfc_nph_av),
-    .pcie_tfc_npd_av(pcie_tfc_npd_av),
-
-    .pcie_cq_np_req(1'b1),
-    .pcie_cq_np_req_count(),
-
-    .cfg_phy_link_down(),
-    .cfg_phy_link_status(),
-    .cfg_negotiated_width(),
-    .cfg_current_speed(),
-    .cfg_max_payload(cfg_max_payload),
-    .cfg_max_read_req(cfg_max_read_req),
-    .cfg_function_status(),
-    .cfg_function_power_state(),
-    .cfg_vf_status(),
-    .cfg_vf_power_state(),
-    .cfg_link_power_state(),
-
-    .cfg_mgmt_addr(cfg_mgmt_addr),
-    .cfg_mgmt_function_number(cfg_mgmt_function_number),
-    .cfg_mgmt_write(cfg_mgmt_write),
-    .cfg_mgmt_write_data(cfg_mgmt_write_data),
-    .cfg_mgmt_byte_enable(cfg_mgmt_byte_enable),
-    .cfg_mgmt_read(cfg_mgmt_read),
-    .cfg_mgmt_read_data(cfg_mgmt_read_data),
-    .cfg_mgmt_read_write_done(cfg_mgmt_read_write_done),
-    .cfg_mgmt_debug_access(1'b0),
-
-    .cfg_err_cor_out(),
-    .cfg_err_nonfatal_out(),
-    .cfg_err_fatal_out(),
-    .cfg_local_error_valid(),
-    .cfg_local_error_out(),
-    .cfg_ltssm_state(),
-    .cfg_rx_pm_state(),
-    .cfg_tx_pm_state(),
-    .cfg_rcb_status(),
-    .cfg_obff_enable(),
-    .cfg_pl_status_change(),
-    .cfg_tph_requester_enable(),
-    .cfg_tph_st_mode(),
-    .cfg_vf_tph_requester_enable(),
-    .cfg_vf_tph_st_mode(),
-
-    .cfg_msg_received(),
-    .cfg_msg_received_data(),
-    .cfg_msg_received_type(),
-    .cfg_msg_transmit(1'b0),
-    .cfg_msg_transmit_type(3'd0),
-    .cfg_msg_transmit_data(32'd0),
-    .cfg_msg_transmit_done(),
-
-    .cfg_fc_ph(cfg_fc_ph),
-    .cfg_fc_pd(cfg_fc_pd),
-    .cfg_fc_nph(cfg_fc_nph),
-    .cfg_fc_npd(cfg_fc_npd),
-    .cfg_fc_cplh(cfg_fc_cplh),
-    .cfg_fc_cpld(cfg_fc_cpld),
-    .cfg_fc_sel(cfg_fc_sel),
-
-    .cfg_dsn(64'd0),
-
-    .cfg_power_state_change_ack(1'b1),
-    .cfg_power_state_change_interrupt(),
-
-    .cfg_err_cor_in(status_error_cor),
-    .cfg_err_uncor_in(status_error_uncor),
-    .cfg_flr_in_process(),
-    .cfg_flr_done(4'd0),
-    .cfg_vf_flr_in_process(),
-    .cfg_vf_flr_func_num(8'd0),
-    .cfg_vf_flr_done(8'd0),
-
-    .cfg_link_training_enable(1'b1),
-
-    .cfg_interrupt_int(4'd0),
-    .cfg_interrupt_pending(4'd0),
-    .cfg_interrupt_sent(),
-    .cfg_interrupt_msi_enable(cfg_interrupt_msi_enable),
-    .cfg_interrupt_msi_mmenable(cfg_interrupt_msi_mmenable),
-    .cfg_interrupt_msi_mask_update(cfg_interrupt_msi_mask_update),
-    .cfg_interrupt_msi_data(cfg_interrupt_msi_data),
-    .cfg_interrupt_msi_select(cfg_interrupt_msi_select),
-    .cfg_interrupt_msi_int(cfg_interrupt_msi_int),
-    .cfg_interrupt_msi_pending_status(cfg_interrupt_msi_pending_status),
-    .cfg_interrupt_msi_pending_status_data_enable(cfg_interrupt_msi_pending_status_data_enable),
-    .cfg_interrupt_msi_pending_status_function_num(cfg_interrupt_msi_pending_status_function_num),
-    .cfg_interrupt_msi_sent(cfg_interrupt_msi_sent),
-    .cfg_interrupt_msi_fail(cfg_interrupt_msi_fail),
-    .cfg_interrupt_msi_attr(cfg_interrupt_msi_attr),
-    .cfg_interrupt_msi_tph_present(cfg_interrupt_msi_tph_present),
-    .cfg_interrupt_msi_tph_type(cfg_interrupt_msi_tph_type),
-    .cfg_interrupt_msi_tph_st_tag(cfg_interrupt_msi_tph_st_tag),
-    .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number),
-
-    .cfg_pm_aspm_l1_entry_reject(1'b0),
-    .cfg_pm_aspm_tx_l0s_entry_disable(1'b0),
-
-    .cfg_hot_reset_out(),
-
-    .cfg_config_space_enable(1'b1),
-    .cfg_req_pm_transition_l23_ready(1'b0),
-    .cfg_hot_reset_in(1'b0),
-
-    .cfg_ds_port_number(8'd0),
-    .cfg_ds_bus_number(8'd0),
-    .cfg_ds_device_number(5'd0),
-
-    .sys_clk(pcie_sys_clk),
-    .sys_clk_gt(pcie_sys_clk_gt),
-    .sys_reset(pcie_reset_n),
-
-    .phy_rdy_out()
-);
 
 // CMAC
 wire                           qsfp1_tx_clk_int;
@@ -649,27 +282,31 @@ qsfp1_cmac_pad_inst (
 
 cmac_usplus_0
 qsfp1_cmac_inst (
-    .gt_rxp_in({qsfp1_rx4_p, qsfp1_rx3_p, qsfp1_rx2_p, qsfp1_rx1_p}), // input
-    .gt_rxn_in({qsfp1_rx4_n, qsfp1_rx3_n, qsfp1_rx2_n, qsfp1_rx1_n}), // input
+    .gt_rxp_in({qsfp1_rx4_p, qsfp1_rx3_p, qsfp1_rx2_p, qsfp1_rx1_p}),  // input
+    .gt_rxn_in({qsfp1_rx4_n, qsfp1_rx3_n, qsfp1_rx2_n, qsfp1_rx1_n}),  // input
     .gt_txp_out({qsfp1_tx4_p, qsfp1_tx3_p, qsfp1_tx2_p, qsfp1_tx1_p}), // output
     .gt_txn_out({qsfp1_tx4_n, qsfp1_tx3_n, qsfp1_tx2_n, qsfp1_tx1_n}), // output
-    .gt_txusrclk2(qsfp1_txuserclk2), // output
-    .gt_loopback_in(12'd0), // input [11:0]
-    .gt_rxrecclkout(), // output [3:0]
-    .gt_powergoodout(), // output [3:0]
-    .gt_ref_clk_out(), // output
-    .gtwiz_reset_tx_datapath(1'b0), // input
-    .gtwiz_reset_rx_datapath(1'b0), // input
-    .sys_reset(rst_125mhz_int), // input
-    .gt_ref_clk_p(qsfp1_mgt_refclk_0_p), // input
-    .gt_ref_clk_n(qsfp1_mgt_refclk_0_n), // input
-    .init_clk(clk_125mhz_int), // input
 
-    .rx_axis_tvalid(qsfp1_rx_axis_tvalid_int), // output
-    .rx_axis_tdata(qsfp1_rx_axis_tdata_int), // output [511:0]
-    .rx_axis_tlast(qsfp1_rx_axis_tlast_int), // output
-    .rx_axis_tkeep(qsfp1_rx_axis_tkeep_int), // output [63:0]
-    .rx_axis_tuser(qsfp1_rx_axis_tuser_int), // output
+    .gt_txusrclk2(qsfp1_txuserclk2),	// output
+
+    .gt_loopback_in(12'd0),		// input [11:0]
+    .gt_rxrecclkout(),			// output [3:0]
+    .gt_powergoodout(),			// output [3:0]
+    .gt_ref_clk_out(),			// output
+    .gtwiz_reset_tx_datapath(1'b0),	// input
+    .gtwiz_reset_rx_datapath(1'b0),	// input
+
+    .gt_ref_clk_p(qsfp1_mgt_refclk_0_p),// input
+    .gt_ref_clk_n(qsfp1_mgt_refclk_0_n),// input
+
+    .init_clk(clk_125mhz),		// input
+    .sys_reset(clk_125mhz_rst),		// input
+
+    .rx_axis_tvalid(qsfp1_rx_axis_tvalid_int),	// output
+    .rx_axis_tdata(qsfp1_rx_axis_tdata_int),	// output [511:0]
+    .rx_axis_tlast(qsfp1_rx_axis_tlast_int),	// output
+    .rx_axis_tkeep(qsfp1_rx_axis_tkeep_int),	// output [63:0]
+    .rx_axis_tuser(qsfp1_rx_axis_tuser_int),	// output
 
     .rx_otn_bip8_0(), // output [7:0]
     .rx_otn_bip8_1(), // output [7:0]
@@ -685,10 +322,11 @@ qsfp1_cmac_inst (
     .rx_otn_lane0(), // output
     .rx_otn_vlmarker(), // output
     .rx_preambleout(), // output [55:0]
-    .usr_rx_reset(qsfp1_rx_rst_int), // output
-    .gt_rxusrclk2(), // output
 
-    .stat_rx_aligned(), // output
+    .usr_rx_reset(qsfp1_rx_rst_int),	// output
+    .gt_rxusrclk2(),			// output
+
+    .stat_rx_aligned(led[1]), // output
     .stat_rx_aligned_err(), // output
     .stat_rx_bad_code(), // output [2:0]
     .stat_rx_bad_fcs(), // output [2:0]
@@ -785,6 +423,11 @@ qsfp1_cmac_inst (
     .stat_rx_packet_large(), // output
     .stat_rx_packet_small(), // output [2:0]
 
+    /*
+     * TODO
+     * The RS-FEC is enabled by default
+     * Can we disable this?
+     */
     .ctl_rx_enable(1'b1), // input
     .ctl_rx_force_resync(1'b0), // input
     .ctl_rx_test_pattern(1'b0), // input
@@ -895,6 +538,7 @@ qsfp1_cmac_inst (
     .tx_ovfout(), // output
     .tx_unfout(), // output
     .tx_preamblein(56'd0), // input [55:0]
+
     .usr_tx_reset(qsfp1_tx_rst_int), // output
 
     .core_drp_reset(1'b0), // input
@@ -944,10 +588,12 @@ qsfp2_cmac_inst (
     .gt_ref_clk_out(), // output
     .gtwiz_reset_tx_datapath(1'b0), // input
     .gtwiz_reset_rx_datapath(1'b0), // input
-    .sys_reset(rst_125mhz_int), // input
+
     .gt_ref_clk_p(qsfp2_mgt_refclk_0_p), // input
     .gt_ref_clk_n(qsfp2_mgt_refclk_0_n), // input
-    .init_clk(clk_125mhz_int), // input
+
+    .init_clk(clk_125mhz), // input
+    .sys_reset(clk_125mhz_rst), // input
 
     .rx_axis_tvalid(qsfp2_rx_axis_tvalid_int), // output
     .rx_axis_tdata(qsfp2_rx_axis_tdata_int), // output [511:0]
@@ -972,7 +618,7 @@ qsfp2_cmac_inst (
     .usr_rx_reset(qsfp2_rx_rst_int), // output
     .gt_rxusrclk2(), // output
 
-    .stat_rx_aligned(), // output
+    .stat_rx_aligned(led[0]), // output
     .stat_rx_aligned_err(), // output
     .stat_rx_bad_code(), // output [2:0]
     .stat_rx_bad_fcs(), // output [2:0]
@@ -1206,8 +852,8 @@ core_inst (
      * Clock: 250 MHz
      * Synchronous reset
      */
-    .clk_250mhz(pcie_user_clk),
-    .rst_250mhz(pcie_user_reset),
+    .clk_250mhz(clk_250mhz),
+    .rst_250mhz(clk_250mhz_rst),
 
     /*
      * GPIO
@@ -1218,7 +864,6 @@ core_inst (
     .btnr(btnr_int),
     .btnc(btnc_int),
     .sw(sw_int),
-    .led(led),
     .pmod0(pmod0),
     .pmod1(pmod1),
 
@@ -1233,123 +878,55 @@ core_inst (
     .i2c_sda_t(i2c_sda_t),
 
     /*
-     * PCIe
-     */
-    .m_axis_rq_tdata(axis_rq_tdata),
-    .m_axis_rq_tkeep(axis_rq_tkeep),
-    .m_axis_rq_tlast(axis_rq_tlast),
-    .m_axis_rq_tready(axis_rq_tready),
-    .m_axis_rq_tuser(axis_rq_tuser),
-    .m_axis_rq_tvalid(axis_rq_tvalid),
-
-    .s_axis_rc_tdata(axis_rc_tdata),
-    .s_axis_rc_tkeep(axis_rc_tkeep),
-    .s_axis_rc_tlast(axis_rc_tlast),
-    .s_axis_rc_tready(axis_rc_tready),
-    .s_axis_rc_tuser(axis_rc_tuser),
-    .s_axis_rc_tvalid(axis_rc_tvalid),
-
-    .s_axis_cq_tdata(axis_cq_tdata),
-    .s_axis_cq_tkeep(axis_cq_tkeep),
-    .s_axis_cq_tlast(axis_cq_tlast),
-    .s_axis_cq_tready(axis_cq_tready),
-    .s_axis_cq_tuser(axis_cq_tuser),
-    .s_axis_cq_tvalid(axis_cq_tvalid),
-
-    .m_axis_cc_tdata(axis_cc_tdata),
-    .m_axis_cc_tkeep(axis_cc_tkeep),
-    .m_axis_cc_tlast(axis_cc_tlast),
-    .m_axis_cc_tready(axis_cc_tready),
-    .m_axis_cc_tuser(axis_cc_tuser),
-    .m_axis_cc_tvalid(axis_cc_tvalid),
-
-    .s_axis_rq_seq_num_0(pcie_rq_seq_num0),
-    .s_axis_rq_seq_num_valid_0(pcie_rq_seq_num_vld0),
-    .s_axis_rq_seq_num_1(pcie_rq_seq_num1),
-    .s_axis_rq_seq_num_valid_1(pcie_rq_seq_num_vld1),
-
-    .pcie_tfc_nph_av(pcie_tfc_nph_av),
-    .pcie_tfc_npd_av(pcie_tfc_npd_av),
-
-    .cfg_max_payload(cfg_max_payload),
-    .cfg_max_read_req(cfg_max_read_req),
-
-    .cfg_mgmt_addr(cfg_mgmt_addr),
-    .cfg_mgmt_function_number(cfg_mgmt_function_number),
-    .cfg_mgmt_write(cfg_mgmt_write),
-    .cfg_mgmt_write_data(cfg_mgmt_write_data),
-    .cfg_mgmt_byte_enable(cfg_mgmt_byte_enable),
-    .cfg_mgmt_read(cfg_mgmt_read),
-    .cfg_mgmt_read_data(cfg_mgmt_read_data),
-    .cfg_mgmt_read_write_done(cfg_mgmt_read_write_done),
-
-    .cfg_fc_ph(cfg_fc_ph),
-    .cfg_fc_pd(cfg_fc_pd),
-    .cfg_fc_nph(cfg_fc_nph),
-    .cfg_fc_npd(cfg_fc_npd),
-    .cfg_fc_cplh(cfg_fc_cplh),
-    .cfg_fc_cpld(cfg_fc_cpld),
-    .cfg_fc_sel(cfg_fc_sel),
-
-    .cfg_interrupt_msi_enable(cfg_interrupt_msi_enable),
-    .cfg_interrupt_msi_mmenable(cfg_interrupt_msi_mmenable),
-    .cfg_interrupt_msi_mask_update(cfg_interrupt_msi_mask_update),
-    .cfg_interrupt_msi_data(cfg_interrupt_msi_data),
-    .cfg_interrupt_msi_select(cfg_interrupt_msi_select),
-    .cfg_interrupt_msi_int(cfg_interrupt_msi_int),
-    .cfg_interrupt_msi_pending_status(cfg_interrupt_msi_pending_status),
-    .cfg_interrupt_msi_pending_status_data_enable(cfg_interrupt_msi_pending_status_data_enable),
-    .cfg_interrupt_msi_pending_status_function_num(cfg_interrupt_msi_pending_status_function_num),
-    .cfg_interrupt_msi_sent(cfg_interrupt_msi_sent),
-    .cfg_interrupt_msi_fail(cfg_interrupt_msi_fail),
-    .cfg_interrupt_msi_attr(cfg_interrupt_msi_attr),
-    .cfg_interrupt_msi_tph_present(cfg_interrupt_msi_tph_present),
-    .cfg_interrupt_msi_tph_type(cfg_interrupt_msi_tph_type),
-    .cfg_interrupt_msi_tph_st_tag(cfg_interrupt_msi_tph_st_tag),
-    .cfg_interrupt_msi_function_number(cfg_interrupt_msi_function_number),
-
-    .status_error_cor(status_error_cor),
-    .status_error_uncor(status_error_uncor),
-
-    /*
      * Ethernet: QSFP28
      */
     .qsfp1_tx_clk(qsfp1_tx_clk_int),
     .qsfp1_tx_rst(qsfp1_tx_rst_int),
+
     .qsfp1_tx_axis_tdata(qsfp1_tx_axis_tdata_int),
     .qsfp1_tx_axis_tkeep(qsfp1_tx_axis_tkeep_int),
     .qsfp1_tx_axis_tvalid(qsfp1_tx_axis_tvalid_int),
     .qsfp1_tx_axis_tready(qsfp1_tx_axis_tready_int),
     .qsfp1_tx_axis_tlast(qsfp1_tx_axis_tlast_int),
     .qsfp1_tx_axis_tuser(qsfp1_tx_axis_tuser_int),
+
     .qsfp1_rx_clk(qsfp1_rx_clk_int),
     .qsfp1_rx_rst(qsfp1_rx_rst_int),
+
     .qsfp1_rx_axis_tdata(qsfp1_rx_axis_tdata_int),
     .qsfp1_rx_axis_tkeep(qsfp1_rx_axis_tkeep_int),
     .qsfp1_rx_axis_tvalid(qsfp1_rx_axis_tvalid_int),
     .qsfp1_rx_axis_tlast(qsfp1_rx_axis_tlast_int),
     .qsfp1_rx_axis_tuser(qsfp1_rx_axis_tuser_int),
+
     .qsfp1_modprsl(qsfp1_modprsl_int),
     .qsfp1_modsell(qsfp1_modsell),
     .qsfp1_resetl(qsfp1_resetl),
     .qsfp1_intl(qsfp1_intl_int),
     .qsfp1_lpmode(qsfp1_lpmode_int),
 
+    /*
+     * Ethernet: QSFP28
+     */
     .qsfp2_tx_clk(qsfp2_tx_clk_int),
     .qsfp2_tx_rst(qsfp2_tx_rst_int),
+
     .qsfp2_tx_axis_tdata(qsfp2_tx_axis_tdata_int),
     .qsfp2_tx_axis_tkeep(qsfp2_tx_axis_tkeep_int),
     .qsfp2_tx_axis_tvalid(qsfp2_tx_axis_tvalid_int),
     .qsfp2_tx_axis_tready(qsfp2_tx_axis_tready_int),
     .qsfp2_tx_axis_tlast(qsfp2_tx_axis_tlast_int),
     .qsfp2_tx_axis_tuser(qsfp2_tx_axis_tuser_int),
+
     .qsfp2_rx_clk(qsfp2_rx_clk_int),
     .qsfp2_rx_rst(qsfp2_rx_rst_int),
+
     .qsfp2_rx_axis_tdata(qsfp2_rx_axis_tdata_int),
     .qsfp2_rx_axis_tkeep(qsfp2_rx_axis_tkeep_int),
     .qsfp2_rx_axis_tvalid(qsfp2_rx_axis_tvalid_int),
     .qsfp2_rx_axis_tlast(qsfp2_rx_axis_tlast_int),
     .qsfp2_rx_axis_tuser(qsfp2_rx_axis_tuser_int),
+
     .qsfp2_modprsl(qsfp2_modprsl_int),
     .qsfp2_modsell(qsfp2_modsell),
     .qsfp2_resetl(qsfp2_resetl),
