@@ -27,7 +27,7 @@ XDC_FILES += ../../../common/syn/tdma_ber_ch.tcl
 # IP
 IP_TCL_FILES = ip/cmac_usplus_0.tcl
 IP_TCL_FILES += ip/cmac_usplus_1.tcl
-IP_TCL_FILES += ip/create_sysctl_bd.tcl
+IP_TCL_FILES += ip/create_sysclk_bd.tcl
 
 # Patch directory (if any)
 SYN_FILES_REL = $(patsubst %, %, $(SYN_FILES))
@@ -64,7 +64,7 @@ clean:
 all:
 	mkdir -p $(VIVADO_PROJECT_FOLDER)
 	echo "create_project $(VIVADO_PROJECT_NAME) "./$(VIVADO_PROJECT_FOLDER)" -part $(FPGA_PART) $*" > $(TCL_CREATE_PROJECT)
-	echo "set_property -name "board_part" -value $(FPGA_BOARD_PART)"
+	echo "set_property -name \"board_part\" -value $(FPGA_BOARD_PART) -objects [current_project]" >> $(TCL_CREATE_PROJECT)
 	for x in $(SYN_FILES_REL); do echo "import_files -fileset sources_1 $$x" >> $(TCL_CREATE_PROJECT); done
 	for x in $(XDC_FILES_REL); do echo "import_files -fileset constrs_1 $$x" >> $(TCL_CREATE_PROJECT); done
 	for x in $(XCI_FILES_REL); do echo "import_ip $$x" >> $(TCL_CREATE_PROJECT); done
@@ -74,7 +74,7 @@ all:
 
 # Open GUI
 g:
-	vivado -nojournal -nolog $(VIVADO_PROJECT_FOLDER)/$(VIVADO_PROJECT_NAME)
+	vivado -nojournal -nolog $(VIVADO_PROJECT_FOLDER)/$(VIVADO_PROJECT_NAME).xpr &
 
 # Run synthesis
 syn:  $(SYN_FILES_REL) $(INC_FILES_REL) $(XDC_FILES_REL)
