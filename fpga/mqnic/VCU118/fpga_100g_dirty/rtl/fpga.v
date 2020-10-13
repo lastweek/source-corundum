@@ -110,8 +110,8 @@ wire clk_125mhz_rst;
 wire clk_locked;
 
 sysclk_bd sysclk_bd_i (
-        .clk_125MHz (clk_125mhz),
-        .clk_250MHz (clk_250mhz),
+        .clk_125mhz (clk_125mhz),
+        .clk_250mhz (clk_250mhz),
         .clk_locked (clk_locked),
 
 	// TODO which rst shall we use?
@@ -864,8 +864,6 @@ core_inst (
     .btnr(btnr_int),
     .btnc(btnc_int),
     .sw(sw_int),
-    .pmod0(pmod0),
-    .pmod1(pmod1),
 
     /*
      * I2C
